@@ -1,0 +1,96 @@
+:root{
+  --bg: #0b1220;
+  --panel: #121a2b;
+  --text: #e9eefc;
+  --muted: #93a4c7;
+
+  --btn: rgba(255,255,255,.08);
+  --btnBorder: rgba(255,255,255,.14);
+  --btnActive: rgba(255,255,255,.16);
+}
+
+*{ box-sizing:border-box; }
+html, body { height: 100%; }
+
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: radial-gradient(1000px 600px at 50% 20%, #182443 0%, var(--bg) 55%);
+  color:var(--text);
+  display:grid;
+  place-items:center;
+  padding: 14px;
+}
+
+#gameContainer{
+  width:min(960px, 96vw);
+  background: color-mix(in srgb, var(--panel) 88%, black);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  padding: 12px;
+  display:grid;
+  justify-items:center;
+  gap: 12px;
+}
+
+#scoreDisplay{
+  font-weight: 800;
+}
+
+canvas{
+  display:block;
+  border-radius: 10px;
+  outline: 1px solid rgba(255,255,255,.10);
+  max-width: 100%;
+  height: auto;
+}
+
+.controls{
+  width: min(320px, 92vw);
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 56px 56px 56px;
+  gap: 10px;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action: manipulation;
+}
+
+.controls > button,
+.controls div > button,
+#restart{
+  border: 1px solid var(--btnBorder);
+  background: var(--btn);
+  color: var(--text);
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 900;
+  display:grid;
+  place-items:center;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.controls button:active,
+#restart:active{
+  background: var(--btnActive);
+}
+
+#up{ grid-column:2; grid-row:1; }
+#left{ grid-column:1; grid-row:2; }
+#right{ grid-column:3; grid-row:2; }
+#down{ grid-column:2; grid-row:3; }
+
+.controls div{
+  grid-column: 1 / 4;
+  grid-row: 2;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.controls div #left{ grid-column:1; }
+.controls div #right{ grid-column:3; }
+
+#restart{
+  min-width: 140px;
+}
