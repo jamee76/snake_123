@@ -2,30 +2,28 @@
 
 // ════════════════════════════════════════════════════════════════
 //  CONFIG  —  All tunable game parameters in one place.
-//  Add levels, obstacles, or new food types by extending this.
 // ════════════════════════════════════════════════════════════════
 const CONFIG = {
-  GRID_COLS:     20,       // horizontal cells
-  GRID_ROWS:     20,       // vertical cells
-  CELL_SIZE:     24,       // pixels per cell
-  INITIAL_SPEED:  8,       // game ticks per second
-  INITIAL_LENGTH: 3,       // starting snake length
+  GRID_COLS:     20,
+  GRID_ROWS:     20,
+  CELL_SIZE:     24,        // pixels per cell  → canvas = 480 × 480
+  INITIAL_SPEED:  8,        // ticks per second
+  INITIAL_LENGTH: 3,
 
-  // RGB colors [R, G, B]
   COLOR: {
-    BG:         [15,  23,  42],   // canvas background
-    GRID_LINE:  [30,  41,  59],   // subtle grid
-    SNAKE_HEAD: [74, 222, 128],   // bright green head
-    SNAKE_BODY: [34, 197,  94],   // slightly darker body
-    FOOD:       [248, 113, 113],  // soft red food
-    TEXT:       [226, 232, 240],  // light text
+    BG:         "#0f172a",
+    GRID_LINE:  "#1e293b",
+    SNAKE_HEAD: "#4ade80",
+    SNAKE_BODY: "#22c55e",
+    FOOD:       "#f87171",
+    TEXT:       "#e2e8f0",
+    OVERLAY:    "rgba(0,0,0,0.6)",
+    BTN_HOVER:  "#ef4444",
   },
 };
 
 // ════════════════════════════════════════════════════════════════
-//  GRID MODULE  —  Tracks which cells are occupied.
-//  Provides fast free-cell lookup for food spawning.
-//  Extendable: add wall/obstacle sets here later.
+//  GRID MODULE
 // ════════════════════════════════════════════════════════════════
 function createGrid(cols, rows) {
   const occupied = new Set();
@@ -37,10 +35,8 @@ function createGrid(cols, rows) {
     isInBounds:  (x, y) => x >= 0 && x < cols && y >= 0 && y < rows,
     occupy:      (x, y) => occupied.add(key(x, y)),
     release:     (x, y) => occupied.delete(key(x, y)),
-    isOccupied:  (x, y) => occupied.has(key(x, y)),
     clear:       ()     => occupied.clear(),
 
-    /** Returns every cell not currently occupied */
     getFreeCells() {
       const free = [];
       for (let x = 0; x < cols; x++)
@@ -52,16 +48,14 @@ function createGrid(cols, rows) {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  SNAKE MODULE  —  Segment array, direction, movement logic.
-//  180° reversals are silently rejected.
+//  SNAKE MODULE
 // ════════════════════════════════════════════════════════════════
 function createSnake(grid, initialLength) {
-  let segments = [];           // [head, ...body]
+  let segments = [];
   let dir      = { x: 1, y: 0 };
   let nextDir  = { x: 1, y: 0 };
 
   function reset() {
-    // Release any existing cells
     for (const s of segments) grid.release(s.x, s.y);
     segments = [];
 
@@ -81,7 +75,7 @@ function createSnake(grid, initialLength) {
   return {
     reset,
 
-    /** Queue a direction change; 180° turn is ignored */
+    /** Queue a direction change; 180° reversals are ignored */
     setDirection(dx, dy) {
       if (dx === -dir.x && dy === -dir.y) return;
       nextDir = { x: dx, y: dy };
@@ -90,7 +84,6 @@ function createSnake(grid, initialLength) {
     getHead()     { return segments[0]; },
     getSegments() { return segments; },
 
-    /** Returns what the next head position will be without mutating state */
     peekNextHead() {
       return {
         x: segments[0].x + nextDir.x,
@@ -98,10 +91,6 @@ function createSnake(grid, initialLength) {
       };
     },
 
-    /**
-     * Advance the snake one step.
-     * @param {boolean} grow – when true the tail is kept (snake ate food).
-     */
     move(grow = false) {
       dir = nextDir;
       const newHead = {
@@ -120,8 +109,7 @@ function createSnake(grid, initialLength) {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  FOOD MODULE  —  Spawns a single food piece on a free cell.
-//  Extendable: support multiple food items / types.
+//  FOOD MODULE
 // ════════════════════════════════════════════════════════════════
 function createFood(grid) {
   let pos = null;
@@ -133,206 +121,256 @@ function createFood(grid) {
     return true;
   }
 
-  spawn();   // place initial food
-
   return {
     spawn,
-    getPos:  ()     => pos,
-    isAt:    (x, y) => pos !== null && pos.x === x && pos.y === y,
-    clear:   ()     => { pos = null; },
+    init()       { spawn(); },
+    getPos()     { return pos; },
+    isAt(x, y)   { return pos !== null && pos.x === x && pos.y === y; },
+    clear()      { pos = null; },
   };
 }
 
 // ════════════════════════════════════════════════════════════════
-//  GAME-STATE MODULE  —  Simple FSM: RUNNING ↔ GAME_OVER.
-//  Extendable: add PAUSED, LEVEL_TRANSITION, etc.
+//  GAME-STATE MODULE
 // ════════════════════════════════════════════════════════════════
 function createGameState() {
-  let running = true;
+  let running = false;
   let score   = 0;
 
   return {
     isRunning:   () => running,
     isGameOver:  () => !running,
+    setRunning:  () => { running = true; },
     setGameOver: () => { running = false; },
-    reset:       () => { running = true; score = 0; },
-    addScore:    (n = 1) => { score += n; },
-    getScore:    () => score,
+    reset()      { running = true; score = 0; },
+    addScore(n = 1) { score += n; },
+    getScore()   { return score; },
   };
 }
 
 // ════════════════════════════════════════════════════════════════
-//  KAPLAY SETUP
+//  RENDERER  —  All canvas drawing in one place.
 // ════════════════════════════════════════════════════════════════
-const CANVAS_W = CONFIG.GRID_COLS * CONFIG.CELL_SIZE;  // 480 px
-const CANVAS_H = CONFIG.GRID_ROWS * CONFIG.CELL_SIZE;  // 480 px
+function createRenderer(canvas, cfg) {
+  const ctx  = canvas.getContext("2d");
+  const CS   = cfg.CELL_SIZE;
+  const W    = cfg.GRID_COLS * CS;
+  const H    = cfg.GRID_ROWS * CS;
 
-kaplay({
-  width:      CANVAS_W,
-  height:     CANVAS_H,
-  canvas:     document.getElementById("gameCanvas"),
-  background: CONFIG.COLOR.BG,
-  global:     true,   // exposes kaplay API in global scope
-});
+  canvas.width  = W;
+  canvas.height = H;
+
+  return {
+    drawFrame(snake, food, state) {
+      // Background
+      ctx.fillStyle = cfg.COLOR.BG;
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid lines
+      ctx.strokeStyle = cfg.COLOR.GRID_LINE;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= cfg.GRID_COLS; x++) {
+        ctx.moveTo(x * CS + 0.5, 0);
+        ctx.lineTo(x * CS + 0.5, H);
+      }
+      for (let y = 0; y <= cfg.GRID_ROWS; y++) {
+        ctx.moveTo(0,     y * CS + 0.5);
+        ctx.lineTo(W, y * CS + 0.5);
+      }
+      ctx.stroke();
+
+      // Food — filled circle
+      const fp = food.getPos();
+      if (fp) {
+        ctx.fillStyle = cfg.COLOR.FOOD;
+        ctx.beginPath();
+        ctx.arc(fp.x * CS + CS / 2, fp.y * CS + CS / 2, CS / 2 - 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Snake segments — rounded rectangles
+      const segs = snake.getSegments();
+      const r    = 4;
+      for (let i = 0; i < segs.length; i++) {
+        const { x, y } = segs[i];
+        ctx.fillStyle = i === 0 ? cfg.COLOR.SNAKE_HEAD : cfg.COLOR.SNAKE_BODY;
+        const px = x * CS + 1;
+        const py = y * CS + 1;
+        const sz = CS - 2;
+        ctx.beginPath();
+        ctx.roundRect(px, py, sz, sz, r);
+        ctx.fill();
+      }
+
+      // Score HUD — dark pill so it's always readable regardless of food position
+      const scoreText = `Score: ${state.getScore()}`;
+      ctx.font = "bold 14px monospace";
+      const tw = ctx.measureText(scoreText).width;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.beginPath();
+      ctx.roundRect(4, 4, tw + 12, 22, 6);
+      ctx.fill();
+      ctx.fillStyle = cfg.COLOR.TEXT;
+      ctx.fillText(scoreText, 10, 20);
+
+      // Game-over overlay
+      if (state.isGameOver()) {
+        ctx.fillStyle = cfg.COLOR.OVERLAY;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.textAlign    = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.fillStyle = cfg.COLOR.FOOD;
+        ctx.font      = "bold 44px monospace";
+        ctx.fillText("GAME OVER", W / 2, H / 2 - 70);
+
+        ctx.fillStyle = cfg.COLOR.TEXT;
+        ctx.font      = "bold 28px monospace";
+        ctx.fillText(`Score: ${state.getScore()}`, W / 2, H / 2 - 20);
+
+        ctx.font = "16px monospace";
+        ctx.fillText("Press ENTER / Space / tap to restart", W / 2, H / 2 + 30);
+
+        // Restart button (drawn on canvas)
+        const bx = W / 2 - 80;
+        const by = H / 2 + 60;
+        const bw = 160;
+        const bh = 44;
+        ctx.fillStyle = cfg.COLOR.FOOD;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 8);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font      = "bold 20px monospace";
+        ctx.fillText("RESTART", W / 2, by + bh / 2);
+
+        ctx.textAlign    = "left";
+        ctx.textBaseline = "alphabetic";
+      }
+    },
+  };
+}
 
 // ════════════════════════════════════════════════════════════════
-//  SCENE: "game"
+//  GAME LOOP
 // ════════════════════════════════════════════════════════════════
-scene("game", () => {
-  const CS = CONFIG.CELL_SIZE;
+function startGame() {
+  const canvas   = document.getElementById("gameCanvas");
+  const cfg      = CONFIG;
+  const renderer = createRenderer(canvas, cfg);
 
-  // Instantiate modules (new instances every time the scene loads)
-  const grid  = createGrid(CONFIG.GRID_COLS, CONFIG.GRID_ROWS);
-  const snake = createSnake(grid, CONFIG.INITIAL_LENGTH);
-  const food  = createFood(grid);
-  const state = createGameState();
+  let grid, snake, food, state;
+  let tickInterval = null;
 
-  // ── Keyboard input ─────────────────────────────────────────
-  onKeyPress(["left",  "a"], () => snake.setDirection(-1,  0));
-  onKeyPress(["right", "d"], () => snake.setDirection( 1,  0));
-  onKeyPress(["up",    "w"], () => snake.setDirection( 0, -1));
-  onKeyPress(["down",  "s"], () => snake.setDirection( 0,  1));
+  function init() {
+    if (tickInterval) clearInterval(tickInterval);
 
-  // ── Fixed-rate game tick ────────────────────────────────────
-  loop(1 / CONFIG.INITIAL_SPEED, () => {
+    grid  = createGrid(cfg.GRID_COLS, cfg.GRID_ROWS);
+    snake = createSnake(grid, cfg.INITIAL_LENGTH);
+    food  = createFood(grid);
+    state = createGameState();
+
+    food.init();
+    state.setRunning();
+
+    tickInterval = setInterval(tick, 1000 / cfg.INITIAL_SPEED);
+    requestAnimationFrame(loop);
+  }
+
+  function tick() {
     if (!state.isRunning()) return;
 
     const next   = snake.peekNextHead();
     const eating = food.isAt(next.x, next.y);
     const segs   = snake.getSegments();
 
-    // --- Wall collision ---
+    // Wall collision
     if (!grid.isInBounds(next.x, next.y)) {
       state.setGameOver();
-      go("gameover", state.getScore());
+      clearInterval(tickInterval);
       return;
     }
 
-    // --- Self-collision ---
-    // When not eating the tail vacates, so skip the last segment.
+    // Self-collision (tail vacates when not eating, so skip last segment)
     const checkLimit = eating ? segs.length : segs.length - 1;
     for (let i = 1; i < checkLimit; i++) {
       if (segs[i].x === next.x && segs[i].y === next.y) {
         state.setGameOver();
-        go("gameover", state.getScore());
+        clearInterval(tickInterval);
         return;
       }
     }
 
-    // --- Move ---
     snake.move(eating);
 
-    // --- Eat food ---
     if (eating) {
       food.clear();
       state.addScore(1);
       food.spawn();
     }
+  }
+
+  let animId = null;
+  function loop() {
+    renderer.drawFrame(snake, food, state);
+    animId = requestAnimationFrame(loop);
+  }
+
+  // ── Input: keyboard ────────────────────────────────────────
+  document.addEventListener("keydown", (e) => {
+    if (state.isGameOver()) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); init(); }
+      return;
+    }
+    switch (e.key) {
+      case "ArrowLeft":  case "a": snake.setDirection(-1,  0); break;
+      case "ArrowRight": case "d": snake.setDirection( 1,  0); break;
+      case "ArrowUp":    case "w": snake.setDirection( 0, -1); break;
+      case "ArrowDown":  case "s": snake.setDirection( 0,  1); break;
+    }
   });
 
-  // ── Draw (called every frame) ───────────────────────────────
-  onDraw(() => {
-    // Grid lines (1-px rectangles spanning the full canvas)
-    for (let x = 0; x <= CONFIG.GRID_COLS; x++) {
-      drawRect({
-        pos:    vec2(x * CS, 0),
-        width:  1,
-        height: CANVAS_H,
-        color:  rgb(...CONFIG.COLOR.GRID_LINE),
-      });
-    }
-    for (let y = 0; y <= CONFIG.GRID_ROWS; y++) {
-      drawRect({
-        pos:    vec2(0,        y * CS),
-        width:  CANVAS_W,
-        height: 1,
-        color:  rgb(...CONFIG.COLOR.GRID_LINE),
-      });
-    }
-
-    // Snake segments
-    const segs = snake.getSegments();
-    for (let i = 0; i < segs.length; i++) {
-      const col = i === 0 ? CONFIG.COLOR.SNAKE_HEAD : CONFIG.COLOR.SNAKE_BODY;
-      drawRect({
-        pos:    vec2(segs[i].x * CS + 1, segs[i].y * CS + 1),
-        width:  CS - 2,
-        height: CS - 2,
-        color:  rgb(...col),
-        radius: 3,
-      });
-    }
-
-    // Food
-    const fp = food.getPos();
-    if (fp) {
-      drawCircle({
-        pos:    vec2(fp.x * CS + CS / 2, fp.y * CS + CS / 2),
-        radius: CS / 2 - 3,
-        color:  rgb(...CONFIG.COLOR.FOOD),
-      });
-    }
-
-    // Score HUD (top-left corner)
-    drawText({
-      text:  `Score: ${state.getScore()}`,
-      size:  14,
-      pos:   vec2(6, 6),
-      color: rgb(...CONFIG.COLOR.TEXT),
-    });
+  // ── Input: canvas click / tap (restart button hit-test) ────
+  canvas.addEventListener("click", (e) => {
+    if (!state.isGameOver()) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const cx = (e.clientX - rect.left) * scaleX;
+    const cy = (e.clientY - rect.top)  * scaleY;
+    const W  = cfg.GRID_COLS * cfg.CELL_SIZE;
+    const H  = cfg.GRID_ROWS * cfg.CELL_SIZE;
+    const bx = W / 2 - 80, by = H / 2 + 60, bw = 160, bh = 44;
+    if (cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh) init();
   });
-});
 
-// ════════════════════════════════════════════════════════════════
-//  SCENE: "gameover"
-// ════════════════════════════════════════════════════════════════
-scene("gameover", (score) => {
-  const cx = CANVAS_W / 2;
-  const cy = CANVAS_H / 2;
+  // ── Input: mobile D-pad buttons ────────────────────────────
+  const btnMap = {
+    "btn-up":    [  0, -1],
+    "btn-down":  [  0,  1],
+    "btn-left":  [ -1,  0],
+    "btn-right": [  1,  0],
+  };
+  Object.entries(btnMap).forEach(([id, dpad]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const handler = (e) => {
+      e.preventDefault();
+      if (state.isRunning()) snake.setDirection(dpad[0], dpad[1]);
+    };
+    el.addEventListener("click",      handler);
+    el.addEventListener("touchstart", handler, { passive: false });
+  });
 
-  // GAME OVER title
-  add([
-    text("GAME OVER", { size: 40 }),
-    pos(cx, cy - 80),
-    anchor("center"),
-    color(...CONFIG.COLOR.FOOD),
-  ]);
+  init();
+}
 
-  // Final score
-  add([
-    text(`Score: ${score}`, { size: 26 }),
-    pos(cx, cy - 20),
-    anchor("center"),
-    color(...CONFIG.COLOR.TEXT),
-  ]);
-
-  // Keyboard hint
-  add([
-    text("Press ENTER or Space to restart", { size: 14 }),
-    pos(cx, cy + 30),
-    anchor("center"),
-    color(...CONFIG.COLOR.TEXT),
-  ]);
-
-  // Clickable RESTART button
-  const btn = add([
-    rect(180, 44, { radius: 8 }),
-    pos(cx, cy + 90),
-    anchor("center"),
-    color(...CONFIG.COLOR.FOOD),
-    area(),
-  ]);
-
-  add([
-    text("RESTART", { size: 20 }),
-    pos(cx, cy + 90),
-    anchor("center"),
-    color(255, 255, 255),
-  ]);
-
-  btn.onClick(() => go("game"));
-  onKeyPress(["enter", "space"], () => go("game"));
-});
-
-// ── Launch ──────────────────────────────────────────────────────
-go("game");
+// ── Boot ────────────────────────────────────────────────────────
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startGame);
+} else {
+  startGame();
+}

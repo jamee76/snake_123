@@ -3,40 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Snake — Kaplay.js</title>
+  <title>Snake</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app">
     <canvas id="gameCanvas"></canvas>
+
+    <!-- Mobile D-pad -->
+    <div id="dpad">
+      <button id="btn-up"    class="dpad-btn" aria-label="Up">▲</button>
+      <div class="dpad-row">
+        <button id="btn-left"  class="dpad-btn" aria-label="Left">◀</button>
+        <button id="btn-right" class="dpad-btn" aria-label="Right">▶</button>
+      </div>
+      <button id="btn-down"  class="dpad-btn" aria-label="Down">▼</button>
+    </div>
   </div>
-  <!-- Sequential loader: local kaplay.js first, CDN fallback, then game.js -->
-  <script>
-    (function () {
-      function loadScript(src, onload) {
-        var s = document.createElement("script");
-        s.src = src;
-        s.onload = onload;
-        s.onerror = onload; // let caller decide what to do on error
-        document.body.appendChild(s);
-      }
 
-      function loadGame() {
-        loadScript("game.js", function () {});
-      }
-
-      // Try local copy first (works offline + in dev). If missing, use CDN.
-      var localKaplay = document.createElement("script");
-      localKaplay.src = "kaplay.js";
-      localKaplay.onload = loadGame;
-      localKaplay.onerror = function () {
-        var cdn = document.createElement("script");
-        cdn.src = "https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js";
-        cdn.onload = loadGame;
-        document.body.appendChild(cdn);
-      };
-      document.body.appendChild(localKaplay);
-    })();
-  </script>
+  <script src="game.js"></script>
 </body>
 </html>
