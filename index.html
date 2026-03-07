@@ -10,7 +10,33 @@
   <div id="app">
     <canvas id="gameCanvas"></canvas>
   </div>
-  <script src="https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js"></script>
-  <script src="game.js"></script>
+  <!-- Sequential loader: local kaplay.js first, CDN fallback, then game.js -->
+  <script>
+    (function () {
+      function loadScript(src, onload) {
+        var s = document.createElement("script");
+        s.src = src;
+        s.onload = onload;
+        s.onerror = onload; // let caller decide what to do on error
+        document.body.appendChild(s);
+      }
+
+      function loadGame() {
+        loadScript("game.js", function () {});
+      }
+
+      // Try local copy first (works offline + in dev). If missing, use CDN.
+      var localKaplay = document.createElement("script");
+      localKaplay.src = "kaplay.js";
+      localKaplay.onload = loadGame;
+      localKaplay.onerror = function () {
+        var cdn = document.createElement("script");
+        cdn.src = "https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js";
+        cdn.onload = loadGame;
+        document.body.appendChild(cdn);
+      };
+      document.body.appendChild(localKaplay);
+    })();
+  </script>
 </body>
 </html>
